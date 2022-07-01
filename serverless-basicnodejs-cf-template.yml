@@ -82,12 +82,40 @@ Parameters:
     Default: "SampleTable"
     AllowedPattern: .*[a-zA-Z]*
     ConstraintDescription: "Main table name."
-  DdbTable1Pk:
+  DdbTable1PrimaryKey:
     Type: String
     Default: "PrimaryKey"
     AllowedPattern: .*[a-zA-Z]*
     ConstraintDescription: "Allow ascii alphabets only."
+  DdbTable1SortKey:
+    Type: String
+    Default: "SortKey"
+    AllowedPattern: .*[a-zA-Z]*
+    ConstraintDescription: "Allow ascii alphabets only."
+  DdbPrimaryKeyType:
+    Type: String
+    Default: string
+    AllowedValues:
+    - string
+    - number
+    - binary
+    Description: "Select between S=String / N=Number / B=Binary. Default is string"
+  DdbSortKeyType:
+    Type: String
+    Default: string
+    AllowedValues:
+    - string
+    - number
+    - binary
+    Description: "Select between S=String / N=Number / B=Binary. Default is string"
 
+  DdbTable1Billing:
+    Type: String
+    Default: ondemand
+    AllowedValues:
+    - ondemand
+    - provisioned
+    Description: "Choose between ondemand or provisioned"
 
 
 Metadata:
@@ -107,13 +135,27 @@ Metadata:
 
 Mappings:
   EnvironmentMap:
-    Production:
+    production:
       ResourceName: prd
-    Development:
+    development:
       ResourceName: dev
-    Staging:
+    staging:
       ResourceName: stg
-    
+  DdbAttributeTypeMap:
+    string:
+      Type: "S"
+    number:
+      Type: "N"
+    binary:
+      Type: "B"
+  DdbBillingMode:
+    ondemand:
+      Mode: "PAY_PER_REQUEST"
+    provisioned:
+      Mode: "PROVISIONED"
+
+
+
 Conditions:
     CreateProdResource: !Equals
     - !Ref Environment
@@ -331,15 +373,20 @@ Resources:
     Type: AWS::DynamoDB::Table
     Properties:
       AttributeDefinitions:
-        AttributeName: 
-        AttributeType:
-      BillingMode: "String"
+      - AttributeName: !Ref DdbTable1PrimaryKey
+        AttributeType: !FindInMap [ DdbAttributeTypeMap, !Ref DdbPrimaryKeyType, Type ]
+      - AttributeName: !Ref DdbTable1SortKey
+        AttributeType: !FindInMap [ DdbAttributeTypeMap, !Ref DdbSortKeyType, Type ]
+      BillingMode: !FindInMap [ DdbBillingMode, DdbTable1Billing, Mode ]
       ContributorInsightsSpecification:
         Enabled: false
-      GlobalSecondaryIndexes:
-        GlobalSecondaryIndexes
-      KeySchema: # Required
-        KeySchema
+      # GlobalSecondaryIndexes:
+      #   GlobalSecondaryIndexes
+      KeySchema:
+      - AttributeName: !Ref DdbTable1PrimaryKey
+        KeyType:  HASH
+      - AttributeName: !Ref DdbTable1SortKey
+        KeyType: RANGE
       KinesisStreamSpecification:
         StreamArn: "String"
       LocalSecondaryIndexes:

@@ -1,0 +1,181 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: |
+  For Lambda Stack Creation
+
+
+# Important Parameters
+Parameters:
+  DefaultAccountId:
+    Type: Number
+    Default: 0
+  ProjectName: 
+    Type: String
+    Default: ""
+    Description: "Main name of project that will be used."
+    MaxLength: 30
+    # TODO Constraints
+  ProjectDescription:
+    Type: String
+    Default: "Automated Shift Management for Beyond and xMatters Integration"
+    Description: "Used in several resource descriptions"
+  LambdaFunctionName:
+    Type: String
+    Default: ""
+    Description: "Main name of the functions"
+  Environment:
+    Type: String
+    Default: ""
+    AllowedValues:
+    - Production
+    - Development
+    - Staging
+    Description: "Make sure env is set"
+
+
+
+
+Metadata:
+  Functions:
+    Description: "Functions are only for type of integration only."
+  Databases:
+    Description: "This stack uses DynamoDB as main database."
+    
+
+    
+Mappings:
+  EnvironmentMap:
+    Production:
+      ResourceName: prd
+      TagValue: production
+    Development:
+      ResourceName: dev
+      TagValue: development
+    Staging:
+      ResourceName: stg
+      TagValue: staging
+    
+Conditions:
+    CreateProdResource: !Equals
+    - !Ref Environment
+    - Production
+    
+
+
+
+
+# Resources. Please replace parameters above as much as possible.
+Resources:
+  # User for Resources
+  CFBEYONDUSER:
+    Type: AWS::IAM::User
+    Properties:
+      Policies:
+        Policies
+      Tags:
+      - Key: ENV
+        Value: !FindInMap [EnvironmentMap, !Ref Environment, TagValue]
+      UserName: 
+        !Join
+          - ''
+          - "CFUSER"
+          - !Ref ProjectName
+          - "-"
+          - !FindInMap [EnvironmentMap, !Ref Environment, ResourceName]
+
+  # Services Policy
+  CFBEYONDPOLICY:
+    Type: AWS::IAM::Policy
+    Properties:
+      Groups:
+        Groups
+      PolicyDocument: 
+          Version: '2012-10-17'
+          Statement:
+          - Sid: CustomPolicyIam
+            Effect: Allow
+            Action:
+            - iam:DeleteAccessKey
+            - iam:PassRole # TODO Too strong
+            - iam:UpdateUser
+            - iam:UpdateAccessKey
+            - iam:DeleteUser
+            - iam:TagPolicy
+            - iam:CreateUser
+            - iam:TagUser
+            - iam:CreateAccessKey
+            - sts:AssumeRole
+            Resource:
+            - arn:aws:iam::*:policy/*
+            - arn:aws:iam::*:oidc-provider/*
+            - arn:aws:iam::*:user/*
+          - Sid: CustomPolicyAll
+            Effect: Allow
+            Action:
+            - apigateway:*
+            - s3:*
+            - logs:*
+            - lambda:*
+            - dynamodb:*
+            Resource: "*" # TODO Create Resource role
+      PolicyName: "String" # TODO Required
+      Roles:
+        Roles
+      Users:
+        "xm-integration-user"
+
+  # LAMBDA FUNCTION
+  CFBEYONDLAMBDAFUNCTION1:
+    DependsON:
+    - CFBEYONDUSER
+    - CFBEYONDPOLICY
+    Type: AWS::Lambda::Function
+    Properties:
+      Architectures:
+      - x86_64
+      Code:
+        ZipFile: |
+          'use strict'
+
+          exports.handler = function() {
+
+            console.log('Hello World');
+            return 'Hello World!';
+          }
+      # TODO CodeSigningConfigArn: "String"
+      # TODO DeadLetterConfig:
+        # TargetArn: "String"
+      Description: "String"
+      Environment:
+      EphemeralStorage:
+        Size: Number
+      FileSystemConfigs:
+        FileSystemConfigs
+      FunctionName: "String"
+      Handler: "String"
+      ImageConfig:
+        Command:
+          -
+        EntryPoint:
+          -
+        WorkingDirectory: "String"
+      KmsKeyArn: "String"
+      Layers:
+        Layers
+      MemorySize: Number
+      PackageType: "String"
+      ReservedConcurrentExecutions: Number
+      Role: "String" # Required
+      Runtime: "String"
+      Tags:
+        Tags
+      Timeout: Number
+      TracingConfig:
+        Mode: "String"
+      VpcConfig:
+        SecurityGroupIds:
+          -
+        SubnetIds:
+          -
+Transform:
+    
+Outputs:

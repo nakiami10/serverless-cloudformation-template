@@ -1,0 +1,16 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: |
+  For creating application stack to deploy ddn tables.
+Parameters:
+  
+Metadata:
+  
+Mappings:
+  
+Conditions:
+  
+Resources:
+  
+Transform:
+  
+Outputs:

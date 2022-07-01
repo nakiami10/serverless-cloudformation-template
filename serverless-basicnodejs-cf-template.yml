@@ -71,12 +71,24 @@ Parameters:
 
   # DynamoDB Specific Params
   CreateDb:
-  Type: String
-  Default: "none"
-  AllowedValues:
-  - none
-  - dynamodb
-  Description: "only allows dynamodb for now."
+    Type: String
+    Default: "none"
+    AllowedValues:
+    - none
+    - dynamodb
+    Description: "only allows dynamodb for now."
+  DdbTableName1:
+    Type: String
+    Default: "SampleTable"
+    AllowedPattern: .*[a-zA-Z]*
+    ConstraintDescription: "Main table name."
+  DdbTable1Pk:
+    Type: String
+    Default: "PrimaryKey"
+    AllowedPattern: .*[a-zA-Z]*
+    ConstraintDescription: "Allow ascii alphabets only."
+
+
 
 Metadata:
   TemplateInfo:
@@ -119,7 +131,6 @@ Conditions:
       - !Ref CreateDb
       - dynamodb
     
-
 # Resources. Please replace parameters above as much as possible.
 Resources:
   
@@ -314,7 +325,44 @@ Resources:
         AdditionalVersionWeights:
           -
 
-  # DynamoDB Deployer
+  # DynamoDB 
+  CREATEDDBTABLE1:
+    Condition: CreateDynamoDb
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        AttributeName: 
+        AttributeType:
+      BillingMode: "String"
+      ContributorInsightsSpecification:
+        Enabled: false
+      GlobalSecondaryIndexes:
+        GlobalSecondaryIndexes
+      KeySchema: # Required
+        KeySchema
+      KinesisStreamSpecification:
+        StreamArn: "String"
+      LocalSecondaryIndexes:
+        LocalSecondaryIndexes
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: false
+      ProvisionedThroughput:
+        ReadCapacityUnits: Number
+        WriteCapacityUnits: Number
+      SSESpecification:
+        KMSMasterKeyId: "Number"
+        SSEEnabled: false
+        SSEType: "String"
+      StreamSpecification:
+        StreamViewType: "false"
+      TableClass: "String"
+      TableName: "String"
+      Tags:
+        Tags
+      TimeToLiveSpecification:
+        AttributeName: "String"
+        Enabled: false
+  
 
 Transform:
     

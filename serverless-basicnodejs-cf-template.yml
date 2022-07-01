@@ -1,0 +1,432 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: |
+  For Lambda Stack Creation: NodeJS
+
+# Important Parameters
+Parameters:
+  # Global Params
+  DefaultAccountId:
+    Type: Number
+    Default: 0
+    Description: "Input AWS account number here."
+  ProjectName: 
+    Type: String
+    Default: "SampleProject"
+    Description: "Main name of project that will be used."
+    MaxLength: 30
+    AllowedPattern: ^.[^0-9]$
+  ProjectDescription:
+    Type: String
+    Default: "This is a sample project"
+    MaxLength: 300
+    Description: "Used in several resource descriptions"
+  Environment:
+    Type: String
+    Default: development
+    AllowedValues:
+    - production
+    - development
+    - staging
+    Description: "Make sure env is set"
+
+  # Integration Params
+  ExternalCicd:
+    Type: String
+    Default: false
+    AllowedValues:
+    - true
+    - false
+    Description: "If true, create user with access key and secret as output."
+
+  # Lambda Specific Params
+  LambdaFunctionName:
+    Type: String
+    Default: "SampleFunction"
+    Description: "Main name of the functions"
+  LambdaHandlerPath:
+    Type: String
+    Default: /
+    AllowedPattern: ^.[^0-9]$
+  LambdaNodejsRuntime:
+    Type: String
+    Default: "nodejs16.x"
+    AllowedValues:
+    - nodejs
+    - nodejs12.x
+    - nodejs14.x
+    - nodejs16.x
+    Description: "Allowed nodejs runtimes are nodejs, nodejs12.x/14.x/16.x"
+  LambdaTimeout:
+    Type: Number
+    Default: 20
+    MaxValue: 180
+    MinValue: 1
+    Description: "min 1s up to 3 minutes (180s)."
+  LambdaMemSize:
+    Type: Number
+    Default: 128
+    MaxValue: 10240
+    MinValue: 128
+    Description: "Default is 128MB"
+
+  # DynamoDB Specific Params
+  CreateDb:
+    Type: String
+    Default: "none"
+    AllowedValues:
+    - none
+    - dynamodb
+    Description: "only allows dynamodb for now."
+  DdbTableName1:
+    Type: String
+    Default: "SampleTable"
+    AllowedPattern: .*[a-zA-Z]*
+    ConstraintDescription: "Main table name."
+  DdbTable1PrimaryKey:
+    Type: String
+    Default: "PrimaryKey"
+    AllowedPattern: .*[a-zA-Z]*
+    ConstraintDescription: "Allow ascii alphabets only."
+  DdbTable1SortKey:
+    Type: String
+    Default: "SortKey"
+    AllowedPattern: .*[a-zA-Z]*
+    ConstraintDescription: "Allow ascii alphabets only."
+  DdbPrimaryKeyType:
+    Type: String
+    Default: string
+    AllowedValues:
+    - string
+    - number
+    - binary
+    Description: "Select between S=String / N=Number / B=Binary. Default is string"
+  DdbSortKeyType:
+    Type: String
+    Default: string
+    AllowedValues:
+    - string
+    - number
+    - binary
+    Description: "Select between S=String / N=Number / B=Binary. Default is string"
+
+  DdbTable1Billing:
+    Type: String
+    Default: ondemand
+    AllowedValues:
+    - ondemand
+    - provisioned
+    Description: "Choose between ondemand or provisioned"
+
+
+Metadata:
+  TemplateInfo:
+    Description: |
+      This Cloudformation template was made by Khirmer Dia.
+      For more information, please contact me @khirmer10@gmail.com
+      https://github.com/nakiami10
+  Functions:
+    Description: |
+      Lambda functions... 
+
+      Specifications:
+        1. Can only use zip file upload
+  Databases:
+    Description: "This stack uses DynamoDB as main database."
+
+Mappings:
+  EnvironmentMap:
+    production:
+      ResourceName: prd
+    development:
+      ResourceName: dev
+    staging:
+      ResourceName: stg
+  DdbAttributeTypeMap:
+    string:
+      Type: "S"
+    number:
+      Type: "N"
+    binary:
+      Type: "B"
+  DdbBillingMode:
+    ondemand:
+      Mode: "PAY_PER_REQUEST"
+    provisioned:
+      Mode: "PROVISIONED"
+
+
+
+Conditions:
+    CreateProdResource: !Equals
+    - !Ref Environment
+    - production
+    CreateExternalAccess: !Equals
+    - !Ref ExternalCicd
+    - true
+    DoNotCreateDb: !Not 
+    - !Equals 
+      - !Ref CreateDb
+      - none
+    CreateDynamoDb: !And
+    - !Condition DoNotCreateDb
+    - !Equals 
+      - !Ref CreateDb
+      - dynamodb
+    
+# Resources. Please replace parameters above as much as possible.
+Resources:
+  
+  # User for External CICD Access
+  CFNUSER:
+    Condition: CreateExternalAccess
+    Type: AWS::IAM::User
+    Properties:
+      Policies:
+        Policies
+      Tags:
+      - Key: ENV
+        Value: !Sub Environment
+      UserName: !Sub
+      - "CFUSER-${ProjectName}-${envname}"
+      - envname: !FindInMap [ EnvironmentMap, !Ref Environment, ResourceName ]
+  CFNUSERACCESSKEY:
+    Condition: CreateExternalAccess
+    Type: AWS::IAM::AccessKey
+    Properties:
+      # Serial: Number
+      Status: "Active"
+      UserName: !Ref CFNUSER
+
+  # Services Policy
+  CFNPOLICY:
+    Type: AWS::IAM::Policy
+    Properties:
+      Groups:
+        Groups
+      PolicyDocument: 
+          Version: '2012-10-17'
+          Statement:
+          - Sid: CustomPolicyIam
+            Effect: Allow
+            Action:
+            - iam:DeleteAccessKey
+            - iam:PassRole # TODO Too strong
+            - iam:UpdateUser
+            - iam:UpdateAccessKey
+            - iam:DeleteUser
+            - iam:TagPolicy
+            - iam:CreateUser
+            - iam:TagUser
+            - iam:CreateAccessKey
+            - sts:AssumeRole
+            Resource:
+            - arn:aws:iam::*:policy/*
+            - arn:aws:iam::*:oidc-provider/*
+            - arn:aws:iam::*:user/*
+          - Sid: CustomPolicyAll
+            Effect: Allow
+            Action:
+            # - apigateway:*
+            - s3:*
+            - logs:*
+            - lambda:*
+            - dynamodb:*
+            Resource: "*" # TODO Create Resource role
+      PolicyName: "String" # TODO Required
+
+  CFNLAMBDAROLE:
+    DependsOn:
+    - CFNPOLICY
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument: JSON # Required
+      Description: !Ref Project Description
+      ManagedPolicyArns:
+        ManagedPolicyArns
+      MaxSessionDuration: Number
+      Path: /
+      PermissionsBoundary: "String"
+      Policies:
+        Policies
+      RoleName: "String"
+      Tags:
+        Tags
+
+
+  # LAMBDA FUNCTION
+  CFLAMBDAFUNCTION1:
+    DependsOn:
+    - CFBEYONDUSER
+    - CFBEYONDPOLICY
+    Type: AWS::Lambda::Function
+    Properties:
+      Architectures:
+      - x86_64
+      Code:
+        ZipFile: |
+          'use strict'
+
+          exports.handler = function() {
+
+            console.log('Hello World');
+            return 'Hello World!';
+          }
+      # TODO CodeSigningConfigArn: "String"
+      # TODO DeadLetterConfig:
+        # TargetArn: "String"
+      Description: !Ref ProjectName
+      Environment: 
+        Variables:
+          NODE_ENV: !Sub Environment
+      # EphemeralStorage:
+      #   Size: Number
+      # FileSystemConfigs:
+      #   FileSystemConfigs
+      FunctionName: !Sub 
+      - "func-${ProjectName}-${envname}"
+      - envname: !FindInMap [ EnvironmentMap, !Ref Environment, ResourceName ]
+      Handler: "index.handler"
+      # ImageConfig:
+      #   Command:
+      #     -
+      #   EntryPoint:
+      #     -
+      #   WorkingDirectory: "String"
+      # KmsKeyArn: "String"
+      # Layers:
+      MemorySize: !Ref LambdaMemSize
+      PackageType: "Zip"
+      ReservedConcurrentExecutions: 0
+      Role: !GetAtt CFNLAMBDAROLE.Arn
+      Runtime: !Ref LambdaNodeJsRuntime
+      Tags:
+      - Key: ENV
+        Value: !Sub Environment
+      Timeout: Number
+      # TODO TracingConfig:
+      #   Mode: "String"
+      #[ ] inDev VpcConfig:
+      #   SecurityGroupIds:
+      #     -
+      #   SubnetIds:
+      #     -
+
+  LAMBDAS3CODEREPO:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "coderepo-${ProjectName}"
+      #TODO LifecycleConfiguration:
+      #   Rules:
+      #     -
+      #TODO NotificationConfiguration:
+      #   LambdaConfigurations:
+      #     -
+      #   QueueConfigurations:
+      #     -
+      #   TopicConfigurations:
+      #     -
+      ObjectLockEnabled: false
+      # OwnershipControls:
+      #   Rules:
+      #     -
+      # ReplicationConfiguration:
+      #   Role: "false"
+      #   Rules:
+      #     -
+      Tags:
+      - Key: ENV
+        Value: !Sub Environment
+      VersioningConfiguration:
+        Status: Suspended
+
+
+  # If prod, create stg and dev aliases. if dev, create dev and stg
+  CFNLAMBDAVERSION:
+    DependsOn: 
+    - CFLAMBDAFUNCTION1
+    Type: AWS::Lambda::Version
+    Properties:
+      CodeSha256: "String"
+      Description: "String"
+      FunctionName: "String" # Required
+      ProvisionedConcurrencyConfig:
+        ProvisionedConcurrentExecutions: Number
+
+  CFNLAMBDAALIAS:
+    DependsOn:
+    - CFLAMBDAFUNCTION1
+    Type: AWS::Lambda::Alias
+    Properties:
+      Description: "Create aliases for the functions. Creates dev, stg, prod on 'prod' env"
+      FunctionName: "String" # Required
+      FunctionVersion: "String" # Required
+      Name: "String" # Required
+      ProvisionedConcurrencyConfig:
+        ProvisionedConcurrentExecutions: Number
+      RoutingConfig:
+        AdditionalVersionWeights:
+          -
+
+  # DynamoDB 
+  CREATEDDBTABLE1:
+    Condition: CreateDynamoDb
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+      - AttributeName: !Ref DdbTable1PrimaryKey
+        AttributeType: !FindInMap [ DdbAttributeTypeMap, !Ref DdbPrimaryKeyType, Type ]
+      - AttributeName: !Ref DdbTable1SortKey
+        AttributeType: !FindInMap [ DdbAttributeTypeMap, !Ref DdbSortKeyType, Type ]
+      BillingMode: !FindInMap [ DdbBillingMode, DdbTable1Billing, Mode ]
+      ContributorInsightsSpecification:
+        Enabled: false
+      # GlobalSecondaryIndexes:
+      #   GlobalSecondaryIndexes
+      KeySchema:
+      - AttributeName: !Ref DdbTable1PrimaryKey
+        KeyType:  HASH
+      - AttributeName: !Ref DdbTable1SortKey
+        KeyType: RANGE
+      KinesisStreamSpecification:
+        StreamArn: "String"
+      LocalSecondaryIndexes:
+        LocalSecondaryIndexes
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: false
+      ProvisionedThroughput:
+        ReadCapacityUnits: Number
+        WriteCapacityUnits: Number
+      SSESpecification:
+        KMSMasterKeyId: "Number"
+        SSEEnabled: false
+        SSEType: "String"
+      StreamSpecification:
+        StreamViewType: "false"
+      TableClass: "String"
+      TableName: "String"
+      Tags:
+        Tags
+      TimeToLiveSpecification:
+        AttributeName: "String"
+        Enabled: false
+  
+
+Transform:
+    
+Outputs:
+  LambdaRoleARN:
+    Description: "Role for Lambda Execution. Includes Cloudwatch logging"
+    Value: !GetAtt CFNLAMBDAROLE.Arn
+  S3LambdaRepoCreated:
+    Description: "Show created s3 bucket info"
+    Value: 
+      !Sub |
+        Bucket Name: ${LAMBDAS3CODEREPO}
+        Bucket Domain: ${LAMBDAS3CODEREPO.DomainName}
+  CicdAccess:
+    Description: "Access Keys"
+    Value:
+      !Sub |
+        Access Credentials Created. Please Record as this will only show once.
+        Access Key: ${CFNUSERACCESSKEY}
+        Access Secret: ${CFNUSERACCESSKEY.SecretAccessKey}

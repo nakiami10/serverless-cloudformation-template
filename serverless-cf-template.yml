@@ -1,89 +1,124 @@
 AWSTemplateFormatVersion: 2010-09-09
 Description: |
-  For Lambda Stack Creation
-
+  For Lambda Stack Creation: NodeJS
 
 # Important Parameters
 Parameters:
+  # Global Params
   DefaultAccountId:
     Type: Number
     Default: 0
+    Description: "Input AWS account number here."
   ProjectName: 
     Type: String
-    Default: ""
+    Default: "SampleProject"
     Description: "Main name of project that will be used."
     MaxLength: 30
-    # TODO Constraints
+    AllowedPattern: ^.[^0-9]$
   ProjectDescription:
     Type: String
-    Default: "Automated Shift Management for Beyond and xMatters Integration"
+    Default: "This is a sample project"
+    MaxLength: 300
     Description: "Used in several resource descriptions"
-  LambdaFunctionName:
-    Type: String
-    Default: ""
-    Description: "Main name of the functions"
   Environment:
     Type: String
-    Default: ""
+    Default: development
     AllowedValues:
-    - Production
-    - Development
-    - Staging
+    - production
+    - development
+    - staging
     Description: "Make sure env is set"
 
+  # Integration Params
+  ExternalCicd:
+    Type: String
+    Default: false
+    AllowedValues:
+    - true
+    - false
+    Description: "If true, create user with access key and secret as output."
 
-
+  # Lambda Specific Params
+  LambdaFunctionName:
+    Type: String
+    Default: "SampleFunction"
+    Description: "Main name of the functions"
+  LambdaHandlerPath:
+    Type: String
+    Default: /
+    AllowedPattern: ^.[^0-9]$
+  LambdaNodejsRuntime:
+    Type: String
+    Default: "nodejs16.x"
+    AllowedValues:
+    - nodejs
+    - nodejs12.x
+    - nodejs14.x
+    - nodejs16.x
+    Description: "Allowed nodejs runtimes are nodejs, nodejs12.x/14.x/16.x"
+  LambdaTimeout:
+    Type: Number
+    Default: 20
+    MaxValue: 180
+    MinValue: 1
+    Description: "min 1s up to 3 minutes (180s)."
 
 Metadata:
+  TemplateInfo:
+    Description: |
+      This Cloudformation template was made by Khirmer Dia.
+      For more information, please contact me @khirmer10@gmail.com
+      https://github.com/nakiami10
   Functions:
-    Description: "Functions are only for type of integration only."
+    Description: |
+      Lambda functions... 
   Databases:
     Description: "This stack uses DynamoDB as main database."
-    
 
-    
 Mappings:
   EnvironmentMap:
     Production:
       ResourceName: prd
-      TagValue: production
     Development:
       ResourceName: dev
-      TagValue: development
     Staging:
       ResourceName: stg
-      TagValue: staging
     
 Conditions:
     CreateProdResource: !Equals
     - !Ref Environment
-    - Production
-    
-
-
+    - production
+    CreateExternalAccess: !Equals
+    - !Ref ExternalCicd
+    - true
 
 
 # Resources. Please replace parameters above as much as possible.
 Resources:
-  # User for Resources
-  CFBEYONDUSER:
+  
+  # User for External CICD Access
+  CFNUSER:
+    Condition: CreateExternalAccess
     Type: AWS::IAM::User
     Properties:
       Policies:
         Policies
       Tags:
       - Key: ENV
-        Value: !FindInMap [EnvironmentMap, !Ref Environment, TagValue]
-      UserName: 
-        !Join
-          - ''
-          - "CFUSER"
-          - !Ref ProjectName
-          - "-"
-          - !FindInMap [EnvironmentMap, !Ref Environment, ResourceName]
+        Value: !Sub Environment
+      UserName: !Sub
+      - "CFUSER-${ProjectName}-${envname}"
+      - envname: !FindInMap [ EnvironmentMap, !Ref Environment, ResourceName ]
+  CFNUSERACCESSKEY:
+    Condition: CreateExternalAccess
+    Type: AWS::IAM::AccessKey
+    Properties:
+      # Serial: Number
+      Status: "Active"
+      UserName: !Ref CFNUSER
 
   # Services Policy
-  CFBEYONDPOLICY:
+  CFNPOLICY:
     Type: AWS::IAM::Policy
     Properties:
       Groups:
@@ -118,14 +153,29 @@ Resources:
             - dynamodb:*
             Resource: "*" # TODO Create Resource role
       PolicyName: "String" # TODO Required
-      Roles:
-        Roles
-      Users:
-        "xm-integration-user"
+
+  CFNLAMBDAROLE:
+  DependsOn:
+  - CFNPOLICY
+  Type: AWS::IAM::Role
+  Properties:
+    AssumeRolePolicyDocument: JSON # Required
+    Description: !Ref Project Description
+    ManagedPolicyArns:
+      ManagedPolicyArns
+    MaxSessionDuration: Number
+    Path: /
+    PermissionsBoundary: "String"
+    Policies:
+      Policies
+    RoleName: "String"
+    Tags:
+      Tags
+
 
   # LAMBDA FUNCTION
-  CFBEYONDLAMBDAFUNCTION1:
-    DependsON:
+  CFLAMBDAFUNCTION1:
+    DependsOn:
     - CFBEYONDUSER
     - CFBEYONDPOLICY
     Type: AWS::Lambda::Function
@@ -144,28 +194,31 @@ Resources:
       # TODO CodeSigningConfigArn: "String"
       # TODO DeadLetterConfig:
         # TargetArn: "String"
-      Description: "String"
-      Environment:
-      EphemeralStorage:
-        Size: Number
-      FileSystemConfigs:
-        FileSystemConfigs
-      FunctionName: "String"
-      Handler: "String"
-      ImageConfig:
-        Command:
-          -
-        EntryPoint:
-          -
-        WorkingDirectory: "String"
-      KmsKeyArn: "String"
-      Layers:
-        Layers
-      MemorySize: Number
-      PackageType: "String"
-      ReservedConcurrentExecutions: Number
-      Role: "String" # Required
-      Runtime: "String"
+      Description: !Ref ProjectName
+      Environment: 
+        Variables:
+          NODE_ENV: !Sub Environment
+      # EphemeralStorage:
+      #   Size: Number
+      # FileSystemConfigs:
+      #   FileSystemConfigs
+      FunctionName: !Sub 
+      - "func-${ProjectName}-${envname}"
+      - envname: !FindInMap [ EnvironmentMap, !Ref Environment, ResourceName ]
+      Handler: "index.handler"
+      # ImageConfig:
+      #   Command:
+      #     -
+      #   EntryPoint:
+      #     -
+      #   WorkingDirectory: "String"
+      # KmsKeyArn: "String"
+      # Layers:
+      MemorySize: Number # Default is 128
+      PackageType: "Zip"
+      ReservedConcurrentExecutions: 0
+      Role: !GetAtt CFNLAMBDAROLE.Arn
+      Runtime: "nodejs16.x"
       Tags:
         Tags
       Timeout: Number
@@ -179,3 +232,13 @@ Resources:
 Transform:
     
 Outputs:
+  LambdaRoleARN:
+    Description: "Role for Lambda Execution. Includes Cloudwatch logging"
+    Value: !GetAtt CFNLAMBDAROLE.Arn
+  CicdAccess:
+    Description: "Access Keys"
+    Value:
+      !Sub |
+        Access Credentials Created. Please Record as this will only show once.
+        Access Key: ${CFNUSERACCESSKEY}
+        Access Secret: ${CFNUSERACCESSKEY.SecretAccessKey}

@@ -14,7 +14,7 @@ Parameters:
     Default: "SampleProject"
     Description: "Main name of project that will be used."
     MaxLength: 30
-    AllowedPattern: ^.[^0-9]$
+    AllowedPattern: ^.*[^0-9]$
   ProjectDescription:
     Type: String
     Default: "This is a sample project"
@@ -46,7 +46,7 @@ Parameters:
   LambdaHandlerPath:
     Type: String
     Default: /
-    AllowedPattern: ^.[^0-9]$
+    AllowedPattern: ^.*[^0-9]$
   LambdaNodejsRuntime:
     Type: String
     Default: "nodejs16.x"
@@ -108,10 +108,9 @@ Parameters:
     - number
     - binary
     Description: "Select between S=String / N=Number / B=Binary. Default is string"
-
   DdbTable1Billing:
     Type: String
-    Default: ondemand
+    Default: "ondemand"
     AllowedValues:
     - ondemand
     - provisioned
@@ -240,7 +239,7 @@ Resources:
     Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument: JSON # Required
-      Description: !Ref Project Description
+      Description: !Ref ProjectDescription
       ManagedPolicyArns:
         ManagedPolicyArns
       MaxSessionDuration: Number
@@ -256,8 +255,7 @@ Resources:
   # LAMBDA FUNCTION
   CFLAMBDAFUNCTION1:
     DependsOn:
-    - CFBEYONDUSER
-    - CFBEYONDPOLICY
+    - CFNPOLICY
     Type: AWS::Lambda::Function
     Properties:
       Architectures:
@@ -298,11 +296,11 @@ Resources:
       PackageType: "Zip"
       ReservedConcurrentExecutions: 0
       Role: !GetAtt CFNLAMBDAROLE.Arn
-      Runtime: !Ref LambdaNodeJsRuntime
+      Runtime: !Ref LambdaNodejsRuntime
       Tags:
       - Key: ENV
         Value: !Sub Environment
-      Timeout: Number
+      Timeout: !Ref LambdaTimeout
       # TODO TracingConfig:
       #   Mode: "String"
       #[ ] inDev VpcConfig:
@@ -341,31 +339,31 @@ Resources:
 
 
   # If prod, create stg and dev aliases. if dev, create dev and stg
-  CFNLAMBDAVERSION:
-    DependsOn: 
-    - CFLAMBDAFUNCTION1
-    Type: AWS::Lambda::Version
-    Properties:
-      CodeSha256: "String"
-      Description: "String"
-      FunctionName: "String" # Required
-      ProvisionedConcurrencyConfig:
-        ProvisionedConcurrentExecutions: Number
+  # CFNLAMBDAVERSION:
+  #   DependsOn: 
+  #   - CFLAMBDAFUNCTION1
+  #   Type: AWS::Lambda::Version
+  #   Properties:
+  #     CodeSha256: "String"
+  #     Description: "String"
+  #     FunctionName: "String" # Required
+  #     ProvisionedConcurrencyConfig:
+  #       ProvisionedConcurrentExecutions: Number
 
-  CFNLAMBDAALIAS:
-    DependsOn:
-    - CFLAMBDAFUNCTION1
-    Type: AWS::Lambda::Alias
-    Properties:
-      Description: "Create aliases for the functions. Creates dev, stg, prod on 'prod' env"
-      FunctionName: "String" # Required
-      FunctionVersion: "String" # Required
-      Name: "String" # Required
-      ProvisionedConcurrencyConfig:
-        ProvisionedConcurrentExecutions: Number
-      RoutingConfig:
-        AdditionalVersionWeights:
-          -
+  # CFNLAMBDAALIAS:
+  #   DependsOn:
+  #   - CFLAMBDAFUNCTION1
+  #   Type: AWS::Lambda::Alias
+  #   Properties:
+  #     Description: "Create aliases for the functions. Creates dev, stg, prod on 'prod' env"
+  #     FunctionName: "String" # Required
+  #     FunctionVersion: "String" # Required
+  #     Name: "String" # Required
+  #     ProvisionedConcurrencyConfig:
+  #       ProvisionedConcurrentExecutions: Number
+  #     RoutingConfig:
+  #       AdditionalVersionWeights:
+  #         -
 
   # DynamoDB 
   CREATEDDBTABLE1:
@@ -377,7 +375,7 @@ Resources:
         AttributeType: !FindInMap [ DdbAttributeTypeMap, !Ref DdbPrimaryKeyType, Type ]
       - AttributeName: !Ref DdbTable1SortKey
         AttributeType: !FindInMap [ DdbAttributeTypeMap, !Ref DdbSortKeyType, Type ]
-      BillingMode: !FindInMap [ DdbBillingMode, DdbTable1Billing, Mode ]
+      BillingMode: !FindInMap [ DdbBillingMode, !Ref DdbTable1Billing, Mode ]
       ContributorInsightsSpecification:
         Enabled: false
       # GlobalSecondaryIndexes:
@@ -411,7 +409,6 @@ Resources:
         Enabled: false
   
 
-Transform:
     
 Outputs:
   LambdaRoleARN:
